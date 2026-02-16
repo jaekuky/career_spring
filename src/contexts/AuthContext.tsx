@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { hashPassword, isHashedPassword } from '@/lib/hash';
 
 interface User {
   id: string;
@@ -47,9 +48,25 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (!foundUser) {
       return { success: false, error: '등록되지 않은 이메일입니다.' };
     }
-    
-    if (foundUser.password !== password) {
-      return { success: false, error: '비밀번호가 올바르지 않습니다.' };
+
+    const hashedInput = await hashPassword(password);
+
+    if (isHashedPassword(foundUser.password)) {
+      // 이미 해시된 비밀번호와 비교
+      if (foundUser.password !== hashedInput) {
+        return { success: false, error: '비밀번호가 올바르지 않습니다.' };
+      }
+    } else {
+      // 기존 평문 비밀번호와 비교 (마이그레이션)
+      if (foundUser.password !== password) {
+        return { success: false, error: '비밀번호가 올바르지 않습니다.' };
+      }
+      // 평문 비밀번호를 해시로 마이그레이션
+      foundUser.password = hashedInput;
+      const updatedUsers = storedUsers.map((u: User & { password: string }) =>
+        u.email === email ? foundUser : u
+      );
+      localStorage.setItem('careerspring_users', JSON.stringify(updatedUsers));
     }
 
     const { password: _, ...userWithoutPassword } = foundUser;
@@ -65,11 +82,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return { success: false, error: '이미 가입된 이메일입니다.' };
     }
 
+    const hashedPw = await hashPassword(password);
     const newUser: User & { password: string } = {
       id: crypto.randomUUID(),
       name,
       email,
-      password,
+      password: hashedPw,
       createdAt: new Date().toISOString(),
       isPremium: false,
     };
