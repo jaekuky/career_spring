@@ -1,5 +1,10 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { hashPassword, isHashedPassword } from '@/lib/hash';
+import { Session, User as SupabaseUser } from '@supabase/supabase-js';
+import { supabase } from '@/lib/supabase';
+
+// ---------------------------------------------------------------------------
+// 타입 정의
+// ---------------------------------------------------------------------------
 
 interface User {
   id: string;
@@ -12,12 +17,17 @@ interface User {
 
 interface AuthContextType {
   user: User | null;
+  session: Session | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   signup: (name: string, email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   upgradeToPremium: () => void;
 }
+
+// ---------------------------------------------------------------------------
+// Context
+// ---------------------------------------------------------------------------
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -29,103 +39,131 @@ export const useAuth = () => {
   return context;
 };
 
+// ---------------------------------------------------------------------------
+// 헬퍼: Supabase 유저 → 앱 유저 변환
+// ---------------------------------------------------------------------------
+
+function mapSupabaseUser(supabaseUser: SupabaseUser): User {
+  const meta = supabaseUser.user_metadata ?? {};
+  return {
+    id: supabaseUser.id,
+    name: meta.name ?? meta.full_name ?? '',
+    email: supabaseUser.email ?? '',
+    createdAt: supabaseUser.created_at,
+    isPremium: meta.is_premium ?? false,
+    premiumStartDate: meta.premium_start_date,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Provider
+// ---------------------------------------------------------------------------
+
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // -----------------------------------------------------------------------
+  // 세션 초기화 & onAuthStateChange 리스너
+  // -----------------------------------------------------------------------
   useEffect(() => {
-    const storedUser = localStorage.getItem('careerspring_user');
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    }
-    setIsLoading(false);
-  }, []);
-
-  const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
-    const storedUsers = JSON.parse(localStorage.getItem('careerspring_users') || '[]');
-    const foundUser = storedUsers.find((u: User & { password: string }) => u.email === email);
-    
-    if (!foundUser) {
-      return { success: false, error: '등록되지 않은 이메일입니다.' };
-    }
-
-    const hashedInput = await hashPassword(password);
-
-    if (isHashedPassword(foundUser.password)) {
-      // 이미 해시된 비밀번호와 비교
-      if (foundUser.password !== hashedInput) {
-        return { success: false, error: '비밀번호가 올바르지 않습니다.' };
-      }
-    } else {
-      // 기존 평문 비밀번호와 비교 (마이그레이션)
-      if (foundUser.password !== password) {
-        return { success: false, error: '비밀번호가 올바르지 않습니다.' };
-      }
-      // 평문 비밀번호를 해시로 마이그레이션
-      foundUser.password = hashedInput;
-      const updatedUsers = storedUsers.map((u: User & { password: string }) =>
-        u.email === email ? foundUser : u
-      );
-      localStorage.setItem('careerspring_users', JSON.stringify(updatedUsers));
-    }
-
-    const { password: _, ...userWithoutPassword } = foundUser;
-    setUser(userWithoutPassword);
-    localStorage.setItem('careerspring_user', JSON.stringify(userWithoutPassword));
-    return { success: true };
-  };
-
-  const signup = async (name: string, email: string, password: string): Promise<{ success: boolean; error?: string }> => {
-    const storedUsers = JSON.parse(localStorage.getItem('careerspring_users') || '[]');
-    
-    if (storedUsers.some((u: User) => u.email === email)) {
-      return { success: false, error: '이미 가입된 이메일입니다.' };
-    }
-
-    const hashedPw = await hashPassword(password);
-    const newUser: User & { password: string } = {
-      id: crypto.randomUUID(),
-      name,
-      email,
-      password: hashedPw,
-      createdAt: new Date().toISOString(),
-      isPremium: false,
+    // 1) 현재 세션 가져오기
+    const initSession = async () => {
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      setSession(currentSession);
+      setUser(currentSession?.user ? mapSupabaseUser(currentSession.user) : null);
+      setIsLoading(false);
     };
 
-    storedUsers.push(newUser);
-    localStorage.setItem('careerspring_users', JSON.stringify(storedUsers));
+    initSession();
 
-    const { password: _, ...userWithoutPassword } = newUser;
-    setUser(userWithoutPassword);
-    localStorage.setItem('careerspring_user', JSON.stringify(userWithoutPassword));
+    // 2) 인증 상태 변경 구독
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, newSession) => {
+        setSession(newSession);
+        setUser(newSession?.user ? mapSupabaseUser(newSession.user) : null);
+      },
+    );
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  // -----------------------------------------------------------------------
+  // 로그인
+  // -----------------------------------------------------------------------
+  const login = async (
+    email: string,
+    password: string,
+  ): Promise<{ success: boolean; error?: string }> => {
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
     return { success: true };
   };
 
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem('careerspring_user');
+  // -----------------------------------------------------------------------
+  // 회원가입
+  // -----------------------------------------------------------------------
+  const signup = async (
+    name: string,
+    email: string,
+    password: string,
+  ): Promise<{ success: boolean; error?: string }> => {
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          name,
+          is_premium: false,
+        },
+      },
+    });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+    return { success: true };
   };
 
-  const upgradeToPremium = () => {
-    if (user) {
-      const updatedUser = { 
-        ...user, 
-        isPremium: true, 
-        premiumStartDate: new Date().toISOString() 
-      };
-      setUser(updatedUser);
-      localStorage.setItem('careerspring_user', JSON.stringify(updatedUser));
-      
-      const storedUsers = JSON.parse(localStorage.getItem('careerspring_users') || '[]');
-      const updatedUsers = storedUsers.map((u: User & { password: string }) => 
-        u.id === user.id ? { ...u, isPremium: true, premiumStartDate: new Date().toISOString() } : u
-      );
-      localStorage.setItem('careerspring_users', JSON.stringify(updatedUsers));
+  // -----------------------------------------------------------------------
+  // 로그아웃
+  // -----------------------------------------------------------------------
+  const logout = async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+    setSession(null);
+  };
+
+  // -----------------------------------------------------------------------
+  // 프리미엄 업그레이드 (user_metadata 업데이트)
+  // -----------------------------------------------------------------------
+  const upgradeToPremium = async () => {
+    const now = new Date().toISOString();
+    const { data, error } = await supabase.auth.updateUser({
+      data: {
+        is_premium: true,
+        premium_start_date: now,
+      },
+    });
+
+    if (!error && data.user) {
+      setUser(mapSupabaseUser(data.user));
     }
   };
 
+  // -----------------------------------------------------------------------
+  // Render
+  // -----------------------------------------------------------------------
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, signup, logout, upgradeToPremium }}>
+    <AuthContext.Provider
+      value={{ user, session, isLoading, login, signup, logout, upgradeToPremium }}
+    >
       {children}
     </AuthContext.Provider>
   );
