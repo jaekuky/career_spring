@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Navigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { useAnalysis } from '@/contexts/AnalysisContext';
@@ -24,8 +24,7 @@ const AnalysisResult = () => {
   const { toast } = useToast();
 
   if (!currentResult) {
-    navigate('/analysis');
-    return null;
+    return <Navigate to="/analysis" replace />;
   }
 
   const handleSave = () => {
