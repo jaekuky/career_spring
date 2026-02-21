@@ -24,8 +24,8 @@ const MyPage = () => {
     return <Navigate to="/login" replace />;
   }
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     toast({ description: '로그아웃되었습니다' });
     navigate('/');
   };

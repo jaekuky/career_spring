@@ -20,8 +20,8 @@ interface AuthContextType {
   session: Session | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  signup: (name: string, email: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  logout: () => void;
+  signup: (name: string, email: string, password: string) => Promise<{ success: boolean; error?: string; requiresEmailConfirmation?: boolean }>;
+  logout: () => Promise<void>;
   upgradeToPremium: () => void;
 }
 
@@ -38,6 +38,32 @@ export const useAuth = () => {
   }
   return context;
 };
+
+// ---------------------------------------------------------------------------
+// 헬퍼: Supabase 오류 메시지 한국어 번역
+// ---------------------------------------------------------------------------
+
+function translateAuthError(message: string): string {
+  if (message.includes('User already registered') || message.includes('already been registered')) {
+    return '이미 사용 중인 이메일입니다';
+  }
+  if (message.includes('Invalid login credentials')) {
+    return '이메일 또는 비밀번호가 올바르지 않습니다';
+  }
+  if (message.includes('Email not confirmed')) {
+    return '이메일 인증이 필요합니다. 받은 편지함을 확인해주세요';
+  }
+  if (message.includes('Password should be at least')) {
+    return '비밀번호는 8자 이상이어야 합니다';
+  }
+  if (message.includes('rate limit') || message.includes('after 60 seconds')) {
+    return '잠시 후 다시 시도해주세요';
+  }
+  if (message.includes('signup_disabled')) {
+    return '현재 회원가입이 비활성화되어 있습니다';
+  }
+  return message;
+}
 
 // ---------------------------------------------------------------------------
 // 헬퍼: Supabase 유저 → 앱 유저 변환
@@ -101,7 +127,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const { error } = await supabase.auth.signInWithPassword({ email, password });
 
     if (error) {
-      return { success: false, error: error.message };
+      return { success: false, error: translateAuthError(error.message) };
     }
     return { success: true };
   };
@@ -113,8 +139,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     name: string,
     email: string,
     password: string,
-  ): Promise<{ success: boolean; error?: string }> => {
-    const { error } = await supabase.auth.signUp({
+  ): Promise<{ success: boolean; error?: string; requiresEmailConfirmation?: boolean }> => {
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -126,9 +152,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     });
 
     if (error) {
-      return { success: false, error: error.message };
+      return { success: false, error: translateAuthError(error.message) };
     }
-    return { success: true };
+    // session이 null이면 이메일 인증 필요, 있으면 즉시 로그인
+    return { success: true, requiresEmailConfirmation: !data.session };
   };
 
   // -----------------------------------------------------------------------

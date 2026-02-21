@@ -22,7 +22,7 @@ const Login = () => {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSocialLogin = (provider: string) => {
+  const handleSocialLogin = () => {
     toast({
       description: "준비 중입니다",
       duration: 2000,
@@ -85,7 +85,7 @@ const Login = () => {
               variant="kakao" 
               className="w-full" 
               size="lg"
-              onClick={() => handleSocialLogin('kakao')}
+              onClick={() => handleSocialLogin()}
             >
               <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M12 3C6.48 3 2 6.48 2 10.5c0 2.52 1.68 4.74 4.2 6.06-.12.42-.78 2.7-.81 2.88 0 0-.02.06-.01.09.02.06.08.08.14.06.08-.02 3.12-2.04 3.6-2.37.9.12 1.83.18 2.88.18 5.52 0 10-3.48 10-7.5S17.52 3 12 3z"/>
@@ -96,7 +96,7 @@ const Login = () => {
               variant="google" 
               className="w-full" 
               size="lg"
-              onClick={() => handleSocialLogin('google')}
+              onClick={() => handleSocialLogin()}
             >
               <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
                 <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
