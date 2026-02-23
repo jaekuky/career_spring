@@ -16,6 +16,7 @@ const Analysis = lazy(() => import("./pages/Analysis"));
 const AnalysisLoading = lazy(() => import("./pages/AnalysisLoading"));
 const AnalysisResult = lazy(() => import("./pages/AnalysisResult"));
 const MyPage = lazy(() => import("./pages/MyPage"));
+const AuthCallback = lazy(() => import("./pages/AuthCallback"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
@@ -71,6 +72,7 @@ const App = () => (
                 <Route path="/mypage" element={
                   <ProtectedRoute><MyPage /></ProtectedRoute>
                 } />
+                <Route path="/auth/callback" element={<AuthCallback />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>

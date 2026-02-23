@@ -21,6 +21,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   signup: (name: string, email: string, password: string) => Promise<{ success: boolean; error?: string; requiresEmailConfirmation?: boolean }>;
+  // loginWithKakao: () => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   upgradeToPremium: () => void;
 }
@@ -159,6 +160,24 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   // -----------------------------------------------------------------------
+  // 카카오 소셜 로그인 (임시 비활성화)
+  // -----------------------------------------------------------------------
+  // const loginWithKakao = async (): Promise<{ success: boolean; error?: string }> => {
+  //   const { error } = await supabase.auth.signInWithOAuth({
+  //     provider: 'kakao',
+  //     options: {
+  //       redirectTo: `${window.location.origin}/auth/callback`,
+  //       scopes: 'profile_nickname',
+  //     },
+  //   });
+  //
+  //   if (error) {
+  //     return { success: false, error: translateAuthError(error.message) };
+  //   }
+  //   return { success: true };
+  // };
+
+  // -----------------------------------------------------------------------
   // 로그아웃
   // -----------------------------------------------------------------------
   const logout = async () => {
@@ -189,7 +208,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // -----------------------------------------------------------------------
   return (
     <AuthContext.Provider
-      value={{ user, session, isLoading, login, signup, logout, upgradeToPremium }}
+      value={{ user, session, isLoading, login, signup, /* loginWithKakao, */ logout, upgradeToPremium }}
     >
       {children}
     </AuthContext.Provider>
