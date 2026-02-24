@@ -5,42 +5,36 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { useAnalysis, AnalysisInput } from '@/contexts/AnalysisContext';
+import { useAnalysis } from '@/contexts/AnalysisContext';
+import { JOB_CATEGORIES } from '@/constants/jobs';
+import type { AnalysisInput } from '@/types/analysis';
 import { ArrowLeft, Clock, HelpCircle, X } from 'lucide-react';
-import { cn } from '@/lib/utils';
-
-const roles = [
-  '프론트엔드 개발', '백엔드 개발', '풀스택 개발', '모바일 개발',
-  '데이터/ML', 'DevOps', '서비스 기획', 'PM/PO', '사업 기획',
-  'UI/UX 디자인', '그래픽 디자인', '퍼포먼스 마케팅', '콘텐츠 마케팅', '기타'
-];
 
 const skillSuggestions = [
   'JavaScript', 'TypeScript', 'Python', 'Java', 'React', 'Vue.js', 'Node.js',
   'SQL', 'AWS', 'Docker', 'Figma', 'Google Ads', 'SEO', 'Excel'
 ];
 
-const educationOptions = ['고졸', '전문대졸', '4년제 학사', '석사', '박사'];
+// Edge Function의 ALLOWED_EDUCATION과 동일한 값 사용
+const educationOptions = ['고졸', '전문대졸', '대졸', '대학원졸(석사)', '대학원졸(박사)', '기타'];
 
 const Analysis = () => {
   const navigate = useNavigate();
   const { setCurrentInput } = useAnalysis();
-  
-  const [currentRole, setCurrentRole] = useState('');
+
+  const [jobTitle, setJobTitle] = useState('');
   const [yearsOfExperience, setYearsOfExperience] = useState<number>(0);
   const [skills, setSkills] = useState<string[]>([]);
-  const [customSkill, setCustomSkill] = useState('');
   const [achievements, setAchievements] = useState('');
   const [education, setEducation] = useState('');
 
-  const filledFields = [currentRole, yearsOfExperience > 0, skills.length > 0, education].filter(Boolean).length;
+  const filledFields = [jobTitle, yearsOfExperience > 0, skills.length > 0, education].filter(Boolean).length;
   const progress = (filledFields / 4) * 100;
 
   const addSkill = (skill: string) => {
     if (skill && !skills.includes(skill)) {
       setSkills([...skills, skill]);
     }
-    setCustomSkill('');
   };
 
   const removeSkill = (skill: string) => {
@@ -49,24 +43,24 @@ const Analysis = () => {
 
   const handleSubmit = () => {
     const input: AnalysisInput = {
-      currentRole,
+      jobTitle,
       yearsOfExperience,
       skills,
-      achievements,
+      achievements: achievements.trim() || undefined,
       education,
     };
     setCurrentInput(input);
     navigate('/analysis/loading');
   };
 
-  const isValid = currentRole && yearsOfExperience > 0 && skills.length > 0 && education;
+  const isValid = jobTitle && yearsOfExperience > 0 && skills.length > 0 && education;
 
   return (
     <AppLayout showNav={false}>
       <div className="container mx-auto px-4 py-6 max-w-2xl">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
-          <button onClick={() => navigate(-1)} className="text-muted-foreground hover:text-foreground transition-colors">
+          <button type="button" aria-label="뒤로 가기" onClick={() => navigate(-1)} className="text-muted-foreground hover:text-foreground transition-colors">
             <ArrowLeft className="w-5 h-5" />
           </button>
           <h1 className="font-semibold text-foreground">시장 가치 분석</h1>
@@ -75,7 +69,7 @@ const Analysis = () => {
 
         {/* Progress Bar */}
         <div className="h-1 bg-muted rounded-full mb-8 overflow-hidden">
-          <div 
+          <div
             className="h-full bg-primary transition-all duration-300 rounded-full"
             style={{ width: `${progress}%` }}
           />
@@ -93,19 +87,28 @@ const Analysis = () => {
 
         {/* Form */}
         <div className="space-y-6 animate-fade-in-up">
-          {/* Current Role */}
+          {/* Job Title */}
           <div>
             <div className="flex items-center gap-2 mb-2">
               <Label className="text-foreground font-medium">현재 직무 *</Label>
               <HelpCircle className="w-4 h-4 text-muted-foreground" />
             </div>
-            <Select value={currentRole} onValueChange={setCurrentRole}>
+            <Select value={jobTitle} onValueChange={setJobTitle}>
               <SelectTrigger className="bg-card">
                 <SelectValue placeholder="직무를 선택해주세요" />
               </SelectTrigger>
               <SelectContent className="bg-card border-border">
-                {roles.map(role => (
-                  <SelectItem key={role} value={role}>{role}</SelectItem>
+                {Object.values(JOB_CATEGORIES).map(({ label: categoryLabel, roles }) => (
+                  <div key={categoryLabel}>
+                    <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+                      {categoryLabel}
+                    </div>
+                    {roles.map(role => (
+                      <SelectItem key={role.id} value={role.id}>
+                        {role.label}
+                      </SelectItem>
+                    ))}
+                  </div>
                 ))}
               </SelectContent>
             </Select>
@@ -138,12 +141,12 @@ const Analysis = () => {
             {skills.length > 0 && (
               <div className="flex flex-wrap gap-2 mb-3">
                 {skills.map(skill => (
-                  <span 
+                  <span
                     key={skill}
                     className="inline-flex items-center gap-1 bg-primary/10 text-primary px-3 py-1 rounded-full text-sm"
                   >
                     {skill}
-                    <button onClick={() => removeSkill(skill)}>
+                    <button type="button" aria-label={`${skill} 제거`} onClick={() => removeSkill(skill)}>
                       <X className="w-3 h-3" />
                     </button>
                   </span>
@@ -154,6 +157,7 @@ const Analysis = () => {
               {skillSuggestions.filter(s => !skills.includes(s)).slice(0, 8).map(skill => (
                 <button
                   key={skill}
+                  type="button"
                   onClick={() => addSkill(skill)}
                   className="px-3 py-1.5 bg-muted text-muted-foreground rounded-full text-sm hover:bg-accent hover:text-accent-foreground transition-colors"
                 >
@@ -200,7 +204,7 @@ const Analysis = () => {
 
         {/* Submit Button */}
         <div className="mt-8 pb-8">
-          <Button 
+          <Button
             onClick={handleSubmit}
             disabled={!isValid}
             variant="hero"

@@ -5,6 +5,7 @@
 // ============================================================
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { SYSTEM_PROMPT, buildUserPrompt } from './prompts.ts'
 
 // ============================================================
 // 타입 정의 (분석 입출력)
@@ -258,18 +259,11 @@ async function callOpenAI(input: AnalysisInput, signal: AbortSignal): Promise<An
   const apiKey = Deno.env.get('OPENAI_API_KEY')
   if (!apiKey) throw new Error('OPENAI_API_KEY 환경변수가 설정되지 않았습니다.')
 
-  // achievements 비식별화
-  const sanitizedAchievements = input.achievements
-    ? deidentifyText(input.achievements)
-    : null
-
-  const userMessage = JSON.stringify({
-    직무: input.jobTitle,
-    경력_년수: input.yearsOfExperience,
-    기술스택: input.skills,
-    주요성과: sanitizedAchievements ?? '없음',
-    최종학력: input.education,
-  }, null, 2)
+  // achievements 비식별화 후 입력 구성
+  const sanitizedInput: AnalysisInput = {
+    ...input,
+    achievements: input.achievements ? deidentifyText(input.achievements) : null,
+  }
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -287,17 +281,11 @@ async function callOpenAI(input: AnalysisInput, signal: AbortSignal): Promise<An
       messages: [
         {
           role: 'system',
-          content:
-            '당신은 한국 IT/기획/디자인 업계의 이직 시장 전문 분석가입니다.\n' +
-            '사용자의 경력 정보를 분석하여 적정 연봉 범위, 적합한 기업 유형, ' +
-            '핵심 경력 강점을 JSON 형식으로 제공합니다.\n' +
-            '분석은 2024-2025년 한국 채용 시장 데이터를 기반으로 합니다.\n' +
-            '연봉은 만원 단위로, 세전 연봉 기준입니다.\n' +
-            '회사명, 실명 등 개인 식별 정보가 입력에 포함되어 있더라도 분석 결과에는 포함하지 마세요.',
+          content: SYSTEM_PROMPT,
         },
         {
           role: 'user',
-          content: `다음 경력 정보를 분석해 주세요:\n\n${userMessage}`,
+          content: buildUserPrompt(sanitizedInput),
         },
       ],
       max_tokens: 1000,

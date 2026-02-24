@@ -114,7 +114,7 @@ const MyPage = () => {
                       {format(new Date(result.date), 'yyyy.MM.dd HH:mm', { locale: ko })}
                     </p>
                     <p className="font-medium text-foreground">
-                      {(result.salaryMin / 10000).toFixed(0)}만원 ~ {(result.salaryMax / 10000).toFixed(0)}만원
+                      {result.salaryRange.min.toLocaleString()}만원 ~ {result.salaryRange.max.toLocaleString()}만원
                     </p>
                   </div>
                   <ChevronRight className="w-5 h-5 text-muted-foreground" />
