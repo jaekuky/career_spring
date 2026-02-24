@@ -22,6 +22,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   signup: (name: string, email: string, password: string) => Promise<{ success: boolean; error?: string; requiresEmailConfirmation?: boolean }>;
   // loginWithKakao: () => Promise<{ success: boolean; error?: string }>;
+  loginWithGoogle: () => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   upgradeToPremium: () => void;
 }
@@ -160,6 +161,23 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   // -----------------------------------------------------------------------
+  // 구글 소셜 로그인
+  // -----------------------------------------------------------------------
+  const loginWithGoogle = async (): Promise<{ success: boolean; error?: string }> => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+      },
+    });
+
+    if (error) {
+      return { success: false, error: translateAuthError(error.message) };
+    }
+    return { success: true };
+  };
+
+  // -----------------------------------------------------------------------
   // 카카오 소셜 로그인 (임시 비활성화)
   // -----------------------------------------------------------------------
   // const loginWithKakao = async (): Promise<{ success: boolean; error?: string }> => {
@@ -208,7 +226,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // -----------------------------------------------------------------------
   return (
     <AuthContext.Provider
-      value={{ user, session, isLoading, login, signup, /* loginWithKakao, */ logout, upgradeToPremium }}
+      value={{ user, session, isLoading, login, signup, loginWithGoogle, /* loginWithKakao, */ logout, upgradeToPremium }}
     >
       {children}
     </AuthContext.Provider>
